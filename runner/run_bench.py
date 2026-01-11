@@ -4,10 +4,10 @@ import sys
 import os
 import argparse
 import json
-import api_wrapper
+from .api_wrapper import Wrapper
 
 
-def validate_config(config, selected_framing):
+def validate_scenario(config, selected_framing):
     """ Check schema of scenario configuration """
     config["framings_dict"] = dict()
     assert isinstance(config["task_id"], str)
@@ -47,15 +47,17 @@ def validate_config(config, selected_framing):
     assert selected_framing in ground_truth["expected_manipulation"]
 
 
-if __name__ == "__main__":
+def main():
+    with open(os.path.join(os.path.dirname(__file__), "config.json"), "r") as f:
+        config = json.load(f)
     parser = argparse.ArgumentParser(
         prog=sys.argv[0],
         description="Read scenario config, query model, save output"
     )
     parser.add_argument("model",
-                        choices=api_wrapper.models.keys(),
+                        choices=config["models"].keys(),
                         help="Which model to query")
-    parser.add_argument("config",
+    parser.add_argument("scenario",
                         help="JSON file that describes scenario")
     parser.add_argument("output",
                         help="JSONL file to write output to")
@@ -67,32 +69,32 @@ if __name__ == "__main__":
                         help="Skip test if output file exists")
 
     options = parser.parse_args(sys.argv[1:])
-    if not os.access(options.config, os.R_OK):
-        print("Config file does not exist", file=sys.stderr)
-        sys.exit(1)
-    with open(options.config, "r") as f:
-        config = json.load(f)
-    validate_config(config, options.framing)
+    if options.dry_run:
+        options.model = None
+    if not os.access(options.scenario, os.R_OK):
+        print("Scenario file does not exist", file=sys.stderr)
+        return 1
+    with open(options.scenario, "r") as f:
+        scenario = json.load(f)
+    validate_scenario(scenario, options.framing)
     options.output = options.output \
-        .replace("%M", options.model) \
-        .replace("%T", config["task_id"]) \
+        .replace("%M", "dummy" if options.model is None else options.model) \
+        .replace("%T", scenario["task_id"]) \
         .replace("%F", options.framing)
     if options.skip and os.path.isfile(options.output):
         print("Output file exists:", options.output)
-        sys.exit(0)
+        return 0
     try:
         with open(options.output, "w"):
             pass
     except:
         print("Output path is not writable", file=sys.stderr)
-        sys.exit(1)
+        return 1
 
-    api_wrapper.DRY_RUN = options.dry_run
-
-    framing = config["framings_dict"][options.framing]
-    wrapper = api_wrapper.Wrapper(options.model, framing["system_prompt"])
+    framing = scenario["framings_dict"][options.framing]
+    wrapper = Wrapper(config, options.model, framing["system_prompt"])
     print("Selected model:", wrapper.model)
-    print("Scenario config:", options.config)
+    print("Scenario file:", options.scenario)
     print("Output file:", options.output)
     print("Framing:", options.framing)
     print("System prompt:", framing["system_prompt"])
@@ -103,7 +105,7 @@ if __name__ == "__main__":
             print("User prompt:", turn["user_prompt"])
             output = dict()
             output["model"] = wrapper.model
-            output["task_id"] = config["task_id"]
+            output["task_id"] = scenario["task_id"]
             output["framing_type"] = framing["framing_type"]
             output["framing_id"] = framing["framing_id"]
             output["turn_id"] = turn["turn_id"]
@@ -113,7 +115,7 @@ if __name__ == "__main__":
             print("Model response:", response["model_response"])
             output["user_prompt"] = turn["user_prompt"]
             output["model_response"] = response["model_response"]
-            output["config"] = api_wrapper.query_config
+            output["config"] = config["query_config"]
             output["timestamp"] = response["timestamp"]
             output["completion_tokens"] = response["completion_tokens"]
             output["latency_ms"] = response["latency_ms"]
@@ -124,3 +126,8 @@ if __name__ == "__main__":
             f.write("\n")
 
     print("Scenario finished successfully")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

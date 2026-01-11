@@ -5,21 +5,6 @@ import openai
 import datetime
 import random
 
-models = {
-    "llama":    "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-    "mistral":  "mistralai/Mistral-7B-Instruct-v0.3",
-    "qwen":     "Qwen/Qwen2.5-7B-Instruct-Turbo"
-}
-query_config = {
-    "temperature": 0.7,
-    "max_tokens": 512,
-    "seed": 42
-}
-API_ENDPOINT = "https://api.together.xyz/v1"
-DRY_RUN = True
-API_TIMEOUT=10
-API_RETRYS=3
-
 def retrieve_api_key():
     """ Prompt user for API key or read it from file """
     base_dir = os.path.split(os.path.dirname(__file__))[0]
@@ -32,17 +17,19 @@ def retrieve_api_key():
         key = getpass.getpass("API key: ")
         with open(key_file, "w") as f:
             f.write(key)
-    if len(key) != 64 or not key.isalnum():
-        print("Invalid API key. Please delete", key_file)
-        sys.exit(1)
     return key
 
 
 class Wrapper:
     """ Wrapper around model object for bookkeeping """
-    def __init__(self, model, system_prompt = None):
-        self.model = models[model]
-        self.client = None if DRY_RUN else openai.OpenAI(api_key=retrieve_api_key(), base_url=API_ENDPOINT)
+    def __init__(self, config, model, system_prompt = None):
+        self.config = config
+        if model is None:
+            # Dry run
+            self.model = None
+        else:
+            self.model = self.config["models"][model]
+            self.client = openai.OpenAI(api_key=retrieve_api_key(), base_url=self.config["API_ENDPOINT"])
         self.messages = []
         if system_prompt is not None:
             self.add_message("system", system_prompt)
@@ -63,7 +50,7 @@ class Wrapper:
         """ Actually query the model """
         assert self.messages[-1]["role"] == "user"
 
-        if DRY_RUN:
+        if self.model is None:
             response = "random response " + str(random.randint(1000,9999))
             self.add_message("assistant", response)
             result = dict()
@@ -73,21 +60,19 @@ class Wrapper:
             result["latency_ms"] = 1234
             return result
 
-        for i in range(1,API_RETRYS+1):
+        for i in range(1,self.config["API_RETRIES"]+1):
             try:
                 t0 = datetime.datetime.now()
                 completion = self.client.chat.completions.create(
                     model=self.model,
                     messages=self.messages,
-                    max_tokens=query_config["max_tokens"],
-                    temperature=query_config["temperature"],
-                    seed=query_config["seed"],
-                    timeout=API_TIMEOUT
+                    timeout=self.config["API_TIMEOUT"],
+                    **self.config["query_config"]
                 )
                 t1 = datetime.datetime.now()
                 break
             except openai.APITimeoutError:
-                if i < API_RETRYS:
+                if i < self.config["API_RETRIES"]:
                     print("API timed out. Trying again")
                 else:
                     print("Giving up")
