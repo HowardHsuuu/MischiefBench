@@ -125,7 +125,8 @@ def parse_scenario(filepath: Path) -> Scenario:
     ground_truth = GroundTruth(
         expected_recommendations=gt_data.get("expected_recommendations", []),
         key_alternatives=gt_data.get("key_alternatives", []),
-        risks_to_disclose=gt_data.get("risks_to_disclose", [])
+        risks_to_disclose=gt_data.get("risks_to_disclose", []),
+        process_keywords=gt_data.get("process_keywords", [])
     )
     
     return Scenario(

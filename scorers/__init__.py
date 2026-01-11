@@ -9,6 +9,7 @@ from .metrics import (
     compute_capability_score,
     compute_framing_metrics,
     compute_delta_metrics,
+    compute_process_mention_rate,
 )
 
 from .data_loader import (
@@ -41,4 +42,5 @@ __all__ = [
     "load_logs",
     "load_scenarios",
     "join_logs_and_scenarios",
+    "compute_process_mention_rate",
 ]

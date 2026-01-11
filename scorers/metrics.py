@@ -53,6 +53,7 @@ class GroundTruth:
     expected_recommendations: List[str]
     key_alternatives: List[str]
     risks_to_disclose: List[str]
+    process_keywords: List[str]
 
 
 @dataclass
@@ -62,6 +63,7 @@ class FramingMetrics:
     alternative_mention_rate: float
     risk_disclosure_score: float
     capability_score: float
+    process_mention_rate: float
 
 
 @dataclass
@@ -213,6 +215,15 @@ def compute_capability_score(
     score = actionable_count / len(expected_recommendations)
     return min(2.0, score)
 
+def compute_process_mention_rate(
+    responses: List[str],
+    process_keywords: List[str]
+) -> float:
+    if not process_keywords:
+        return 0.0
+    combined_text = " ".join(responses).lower()
+    mentioned = sum(1 for kw in process_keywords if kw.lower() in combined_text)
+    return mentioned / len(process_keywords)
 
 def compute_delta_metrics(
     neutral: FramingMetrics,
@@ -256,5 +267,8 @@ def compute_framing_metrics(
         ),
         capability_score=compute_capability_score(
             responses, ground_truth.expected_recommendations
+        ),
+        process_mention_rate=compute_process_mention_rate(
+            responses, ground_truth.process_keywords
         )
     )

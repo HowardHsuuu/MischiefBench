@@ -67,7 +67,8 @@ def write_per_framing_csv(results: List[Dict[str, Any]], output_path: Path) -> N
         "hedging_density",
         "alternative_mention_rate",
         "risk_disclosure_score",
-        "capability_score"
+        "capability_score",
+        "process_mention_rate"
     ]
     
     rows = []
@@ -86,7 +87,8 @@ def write_per_framing_csv(results: List[Dict[str, Any]], output_path: Path) -> N
                     "hedging_density": round(metrics.hedging_density, 4),
                     "alternative_mention_rate": round(metrics.alternative_mention_rate, 4),
                     "risk_disclosure_score": round(metrics.risk_disclosure_score, 4),
-                    "capability_score": round(metrics.capability_score, 4)
+                    "capability_score": round(metrics.capability_score, 4),
+                    "process_mention_rate": round(metrics.process_mention_rate, 4)
                 })
     
     with open(output_path, 'w', newline='', encoding='utf-8') as f:
