@@ -63,11 +63,23 @@ if __name__ == "__main__":
                         help="Select a framing from the scenario")
     parser.add_argument("-d", "--dry-run", action="store_true",
                         help="Use dummy responses instead of actually querying models")
+    parser.add_argument("-s", "--skip", action="store_true",
+                        help="Skip test if output file exists")
 
     options = parser.parse_args(sys.argv[1:])
     if not os.access(options.config, os.R_OK):
         print("Config file does not exist", file=sys.stderr)
         sys.exit(1)
+    with open(options.config, "r") as f:
+        config = json.load(f)
+    validate_config(config, options.framing)
+    options.output = options.output \
+        .replace("%M", options.model) \
+        .replace("%T", config["task_id"]) \
+        .replace("%F", options.framing)
+    if options.skip and os.path.isfile(options.output):
+        print("Output file exists:", options.output)
+        sys.exit(0)
     try:
         with open(options.output, "w"):
             pass
@@ -75,15 +87,13 @@ if __name__ == "__main__":
         print("Output path is not writable", file=sys.stderr)
         sys.exit(1)
 
-    with open(options.config, "r") as f:
-        config = json.load(f)
-    validate_config(config, options.framing)
     api_wrapper.DRY_RUN = options.dry_run
 
     framing = config["framings_dict"][options.framing]
     wrapper = api_wrapper.Wrapper(options.model, framing["system_prompt"])
     print("Selected model:", wrapper.model)
     print("Scenario config:", options.config)
+    print("Output file:", options.output)
     print("Framing:", options.framing)
     print("System prompt:", framing["system_prompt"])
     with open(options.output, "w") as f:
@@ -109,4 +119,8 @@ if __name__ == "__main__":
             output["latency_ms"] = response["latency_ms"]
 
             json.dump(output, f)
+            if "\n" in response["model_response"]:
+                print("End of model response")
             f.write("\n")
+
+    print("Scenario finished successfully")

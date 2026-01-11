@@ -17,6 +17,8 @@ query_config = {
 }
 API_ENDPOINT = "https://api.together.xyz/v1"
 DRY_RUN = True
+API_TIMEOUT=10
+API_RETRYS=3
 
 def retrieve_api_key():
     """ Prompt user for API key or read it from file """
@@ -71,15 +73,25 @@ class Wrapper:
             result["latency_ms"] = 1234
             return result
 
-        t0 = datetime.datetime.now()
-        completion = self.client.chat.completions.create(
-            model=self.model,
-            messages=self.messages,
-            max_tokens=query_config["max_tokens"],
-            temperature=query_config["temperature"],
-            seed=query_config["seed"]
-        )
-        t1 = datetime.datetime.now()
+        for i in range(1,API_RETRYS+1):
+            try:
+                t0 = datetime.datetime.now()
+                completion = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=self.messages,
+                    max_tokens=query_config["max_tokens"],
+                    temperature=query_config["temperature"],
+                    seed=query_config["seed"],
+                    timeout=API_TIMEOUT
+                )
+                t1 = datetime.datetime.now()
+                break
+            except openai.APITimeoutError:
+                if i < API_RETRYS:
+                    print("API timed out. Trying again")
+                else:
+                    print("Giving up")
+                    raise Exception("API timed out")
 
         response = completion.choices[0].message.content
         self.add_message("assistant", response)
